@@ -1,12 +1,13 @@
-import datetime
 import os
-import ssl
 import time
+import ssl
+import datetime
+import threading
 
 import requests
 import telebot
-from apscheduler.schedulers.blocking import BlockingScheduler
 from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -37,7 +38,7 @@ def check_url(url, path="", keyword=None):
         ok = (r.status_code == 200) and (keyword in r.text if keyword else True)
         latency = time.perf_counter() - start
         return ok, latency
-    except requests.RequestException as e:
+    except requests.RequestException:
         return False, None
 
 
@@ -58,12 +59,10 @@ def monitor():
     if state["site_up"] is None or up != state["site_up"]:
         state["site_up"] = up
         send_alert("✅ WEB is up" if up else "🚨 WEB is down")
-    if not up:
-        print(f"WEB down, latency was {lat}")
 
     # 2) бэкенд
     up, lat = check_url(API, path="/public/offers")
-    if up != state["api_up"]:
+    if state["api_up"] is None or up != state["api_up"]:
         state["api_up"] = up
         send_alert("✅ API is up" if up else "🚨 API is down")
 
@@ -73,7 +72,39 @@ def monitor():
         send_alert(f"⚠️ SSL expires in {days} days")
 
 
+# 1) Хэндлер для команды /status
+@BOT.message_handler(commands=["status"])
+def status_handler(message):
+    site = (
+        "unknown"
+        if state["site_up"] is None
+        else "up" if state["site_up"]
+        else "down"
+    )
+    api = (
+        "unknown"
+        if state["api_up"] is None
+        else "up" if state["api_up"]
+        else "down"
+    )
+    days = check_ssl_days(SITE.replace("https://", ""))
+    ssl_info = f"{days} days" if days is not None else "N/A"
+    text = (
+        f"🌐 Site: *{site}*\n"
+        f"🔗 API: *{api}*\n"
+        f"🔒 SSL: *{ssl_info}*\n"
+    )
+    BOT.send_message(message.chat.id, text, parse_mode="Markdown")
+
+
 if __name__ == "__main__":
-    sched = BlockingScheduler()
-    sched.add_job(monitor, 'interval', minutes=5)
+    # 2) Шлём стартовое сообщение
+    send_alert("🤖 Monitoring bot started and scheduling checks every 5 minutes.")
+
+    # 3) Запускаем планировщик в фоне
+    sched = BackgroundScheduler()
+    sched.add_job(monitor, "interval", minutes=5)
     sched.start()
+
+    # 4) Стартуем приём команд
+    BOT.infinity_polling()
