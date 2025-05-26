@@ -3,6 +3,7 @@ import time
 import ssl
 import datetime
 import threading
+import socket, ssl, datetime
 
 import requests
 import telebot
@@ -45,11 +46,17 @@ def check_url(url, path="", keyword=None):
 
 def check_ssl_days(host):
     try:
-        cert = ssl.get_server_certificate((host, 443))
-        info = ssl._ssl._test_decode_cert(cert)
-        exp = datetime.datetime.strptime(info['notAfter'], "%b %d %H:%M:%S %Y %Z")
-        return (exp - datetime.datetime.utcnow()).days
-    except Exception:
+        ctx = ssl.create_default_context()
+        # соединяемся и сразу получаем cert как dict
+        with socket.create_connection((host, 443), timeout=5) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+        # cert['notAfter'] выглядит как "Jul 12 23:59:59 2025 GMT"
+        exp_str = cert.get('notAfter')
+        exp_dt = datetime.datetime.strptime(exp_str, "%b %d %H:%M:%S %Y %Z")
+        return (exp_dt - datetime.datetime.utcnow()).days
+    except Exception as e:
+        print(f"[SSL CHECK ERROR] host={host!r}, exception={e!r}")
         return None
 
 
