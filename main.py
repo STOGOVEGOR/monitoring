@@ -112,6 +112,11 @@ def status_handler(message):
     BOT.send_message(message.chat.id, text, parse_mode="Markdown")
 
 
+@BOT.message_handler(commands=["chat_id"])
+def echo_chat_id(message):
+    BOT.send_message(message.chat.id, f"Your chat_id: {message.chat.id}")
+
+
 if __name__ == "__main__":
     # 2) Шлём стартовое сообщение
     send_alert("🤖 Monitoring bot started and scheduling checks every 5 minutes.")
