@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from urllib.parse import urlparse
 
 load_dotenv()
 BOT = telebot.TeleBot(os.getenv("TELEGRAM_TOKEN"))
@@ -67,9 +68,16 @@ def monitor():
         send_alert("✅ API is up" if up else "🚨 API is down")
 
     # 3) SSL
-    days = check_ssl_days(SITE.replace("https://", ""))
+    # days = check_ssl_days(SITE.replace("https://", ""))
+    host = get_host_from_url(SITE)
+    days = check_ssl_days(host)
     if days is not None and days < 7:
         send_alert(f"⚠️ SSL expires in {days} days")
+
+
+def get_host_from_url(url: str) -> str:
+    parsed = urlparse(url)
+    return parsed.hostname or url  # на всякий случай fallback
 
 
 # 1) Хэндлер для команды /status
@@ -100,7 +108,7 @@ def status_handler(message):
 if __name__ == "__main__":
     # 2) Шлём стартовое сообщение
     send_alert("🤖 Monitoring bot started and scheduling checks every 5 minutes.")
-
+    monitor()
     # 3) Запускаем планировщик в фоне
     sched = BackgroundScheduler()
     sched.add_job(monitor, "interval", minutes=5)
