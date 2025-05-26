@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 load_dotenv()
 BOT = telebot.TeleBot(os.getenv("TELEGRAM_TOKEN"))
 CHAT = os.getenv("CHAT_ID")
+ADMIN = os.getenv("ADMIN_CHAT_ID")
 SITE = os.getenv("WEBSITE_URL")
 API = os.getenv("BACKEND_HOST")
 
@@ -31,6 +32,7 @@ state = {"site_up": None, "api_up": None}
 
 def send_alert(msg):
     BOT.send_message(CHAT, msg)
+    BOT.send_message(ADMIN, msg)
 
 
 def check_url(url, path="", keyword=None):
