@@ -62,7 +62,7 @@ def monitor():
         print(f"WEB down, latency was {lat}")
 
     # 2) бэкенд
-    up, lat = check_url(API, path="/swagger")
+    up, lat = check_url(API, path="/public/offers")
     if up != state["api_up"]:
         state["api_up"] = up
         send_alert("✅ API is up" if up else "🚨 API is down")
