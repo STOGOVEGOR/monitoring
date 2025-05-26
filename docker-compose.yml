@@ -1,0 +1,9 @@
+services:
+  monitor:
+    build: .
+    container_name: site-back-monitor
+    env_file: .env
+    restart: unless-stopped
+    # если нужно, можно пробросить тома или логи
+    # volumes:
+    #   - ./logs:/app/logs

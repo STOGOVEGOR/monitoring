@@ -1,83 +1,79 @@
+import datetime
 import os
+import ssl
 import time
-# import pytz
-# import sqlite3
-import telebot
-import requests
-import socket
 
-# from datetime import date, timedelta, datetime, time, timezone
+import requests
+import telebot
+from apscheduler.schedulers.blocking import BlockingScheduler
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 load_dotenv()
+BOT = telebot.TeleBot(os.getenv("TELEGRAM_TOKEN"))
+CHAT = os.getenv("CHAT_ID")
+SITE = os.getenv("WEBSITE_URL")
+API = os.getenv("BACKEND_HOST")
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-WEBSITE_URL = os.getenv("WEBSITE_URL")
-BACKEND_HOST = os.getenv("BACKEND_HOST")
-# BACKEND_PORT = int(os.getenv("BACKEND_PORT", 8081))  # значение по умолчанию
+# Настраиваем сессию с retry/backoff
+session = requests.Session()
+session.headers.update({"User-Agent": "WebsiteChecker/1.0"})
+retry = Retry(total=2, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+session.mount("https://", HTTPAdapter(max_retries=retry))
+session.mount("http://", HTTPAdapter(max_retries=retry))
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-# con = sqlite3.connect('/home/MonteBus/bus_bot.db', check_same_thread=False)
-# cur = con.cursor()
-# cur.execute("""
-#         CREATE TABLE USERS (
-#             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-#             user_id INTEGER,
-#             user_name TEXT,
-#             lang TEXT,
-#             counter INTEGER
-#         );
-#     """)
+state = {"site_up": None, "api_up": None}
 
 
-# Функция проверки вебсайта
-def check_website(url):
+def send_alert(msg):
+    BOT.send_message(CHAT, msg)
+
+
+def check_url(url, path="", keyword=None):
+    start = time.perf_counter()
     try:
-        # Добавляем User-Agent для избегания блокировок
-        headers = {"User-Agent": "WebsiteChecker/1.0"}
-        response = requests.get(url, headers=headers, timeout=5, verify=False)
-        return response.status_code == 200
-    except requests.exceptions.SSLError as e:
-        print(f"SSL error: {e}")
-    except requests.exceptions.ConnectionError as e:
-        print(f"Connection error: {e}")
-    except requests.exceptions.Timeout as e:
-        print(f"Timeout error: {e}")
-    except requests.exceptions.RequestException as e:
-        print(f"General error: {e}")
-    return False
+        r = session.get(f"{url}{path}", timeout=(3, 5), verify=False)
+        ok = (r.status_code == 200) and (keyword in r.text if keyword else True)
+        latency = time.perf_counter() - start
+        return ok, latency
+    except requests.RequestException as e:
+        return False, None
 
 
-# Функция проверки порта
-def check_backend(url):
+def check_ssl_days(host):
     try:
-        response = requests.get(f"{url}/swagger", timeout=5)
-        if response.status_code == 200:
-            return True
-        else:
-            print(f"Backend returned status code: {response.status_code}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"Backend check failed: {e}")
-        return False
+        cert = ssl.get_server_certificate((host, 443))
+        info = ssl._ssl._test_decode_cert(cert)
+        exp = datetime.datetime.strptime(info['notAfter'], "%b %d %H:%M:%S %Y %Z")
+        return (exp - datetime.datetime.utcnow()).days
+    except Exception:
+        return None
 
 
-# Уведомление в Telegram
-def send_telegram_message(message):
-    bot.send_message(chat_id=CHAT_ID, text=message)
-
-
-# Основной процесс
 def monitor():
-    if not check_website(WEBSITE_URL):
-        send_telegram_message("🚨 HSC web down.")
-    if not check_backend(BACKEND_HOST):
-        send_telegram_message("🚨 HSC back down.")
+    global state
+    # 1) сайт
+    up, lat = check_url(SITE)
+    if state["site_up"] is None or up != state["site_up"]:
+        state["site_up"] = up
+        send_alert("✅ WEB is up" if up else "🚨 WEB is down")
+    if not up:
+        print(f"WEB down, latency was {lat}")
+
+    # 2) бэкенд
+    up, lat = check_url(API, path="/swagger")
+    if up != state["api_up"]:
+        state["api_up"] = up
+        send_alert("✅ API is up" if up else "🚨 API is down")
+
+    # 3) SSL
+    days = check_ssl_days(SITE.replace("https://", ""))
+    if days is not None and days < 7:
+        send_alert(f"⚠️ SSL expires in {days} days")
 
 
-# Запуск мониторинга каждые 5 минут
 if __name__ == "__main__":
-    while True:
-        monitor()
-        time.sleep(300)  # 300 секунд = 5 минут
+    sched = BlockingScheduler()
+    sched.add_job(monitor, 'interval', minutes=5)
+    sched.start()
