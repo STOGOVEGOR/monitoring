@@ -1,6 +1,11 @@
 # 1) Базовый образ с Python 3.11
 FROM python:3.11-slim
 
+# 2) Устанавливаем pgrep (procps) для healthcheck
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends procps \
+ && rm -rf /var/lib/apt/lists/*
+
 # 2) Рабочая директория внутри контейнера
 WORKDIR /app
 
