@@ -1,17 +1,17 @@
-import os
-import time
-import ssl
 import datetime
-import threading
-import socket, ssl, datetime
+import os
+import socket
+import ssl
+import time
+from urllib.parse import urlparse
 
+import urllib3
 import requests
 import telebot
-from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from urllib.parse import urlparse
 
 load_dotenv()
 BOT = telebot.TeleBot(os.getenv("TELEGRAM_TOKEN"))
@@ -27,7 +27,9 @@ retry = Retry(total=2, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504]
 session.mount("https://", HTTPAdapter(max_retries=retry))
 session.mount("http://", HTTPAdapter(max_retries=retry))
 
-state = {"site_up": None, "api_up": None}
+state = {"site_up": True, "api_up": True}
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def send_alert(msg):
@@ -66,13 +68,13 @@ def monitor():
     global state
     # 1) сайт
     up, lat = check_url(SITE)
-    if state["site_up"] is None or up != state["site_up"]:
+    if up != state["site_up"]:
         state["site_up"] = up
         send_alert("✅ WEB is up" if up else "🚨 WEB is down")
 
     # 2) бэкенд
     up, lat = check_url(API, path="/public/offers")
-    if state["api_up"] is None or up != state["api_up"]:
+    if up != state["api_up"]:
         state["api_up"] = up
         send_alert("✅ API is up" if up else "🚨 API is down")
 
@@ -121,8 +123,8 @@ def echo_chat_id(message):
 
 if __name__ == "__main__":
     # 2) Шлём стартовое сообщение
-    send_alert("🤖 Monitoring bot started and scheduling checks every 5 minutes.")
-    monitor()
+    # send_alert("🤖 Monitoring bot started and scheduling checks every 5 minutes.")
+    # monitor()
     # 3) Запускаем планировщик в фоне
     sched = BackgroundScheduler()
     sched.add_job(monitor, "interval", minutes=5)
