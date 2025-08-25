@@ -33,11 +33,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 #   key: unique id for state tracking and messages
 TARGETS = [
     # WEB targets
-    {"key": "web_main", "name": "WEB main", "url": SITE, "path": "", "keyword": None, "verify": False},
-    {"key": "web_larazon", "name": "WEB Larazon proxy", "url": "https://mioferton.larazon.es", "path": "", "keyword": None, "verify": False},
+    {"key": "web_main", "name": "WEB Mioferton", "url": SITE, "path": "", "keyword": None, "verify": False},
+    {"key": "web_larazon", "name": "WEB Larazon", "url": "https://mioferton.larazon.es", "path": "", "keyword": None, "verify": False},
 
     # API targets
-    {"key": "api_offers", "name": "API offers", "url": API, "path": "/public/offers", "keyword": None, "verify": False},
+    {"key": "api_offers", "name": "API", "url": API, "path": "/public/offers", "keyword": None, "verify": False},
     # {"key": "api_health", "name": "API health", "url": API, "path": "/healthz", "keyword": "healthy", "verify": True},
 ]
 
