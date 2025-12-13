@@ -94,7 +94,13 @@ def monitor():
 
     # 1) HTTP checks (each target individually)
     for t in TARGETS:
-        ok, lat, code = check_url(t["url"], t["path"], t["keyword"], t.get("verify", False))
+        args = (t["url"], t["path"], t["keyword"], t.get("verify", False))
+        ok, lat, code = check_url(*args)
+        # check one more time if not ok
+        if not ok:
+            time.sleep(20)
+            ok, lat, code = check_url(*args)
+
         key = t["key"]
         prev = STATE.get(key)
         if ok != prev:
@@ -149,7 +155,7 @@ def echo_chat_id(message):
 
 if __name__ == "__main__":
     # Optional one-shot run on start:
-    # monitor()
+    monitor()
     sched = BackgroundScheduler()
     sched.add_job(monitor, "interval", minutes=5)
     sched.start()
