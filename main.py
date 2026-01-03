@@ -34,7 +34,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 TARGETS = [
     # WEB targets
     {"key": "web_main", "name": "WEB Mioferton", "url": SITE, "path": "", "keyword": None, "verify": False},
-    {"key": "web_larazon", "name": "WEB Larazon", "url": "https://mioferton.larazon.es", "path": "", "keyword": None, "verify": False},
+    # {"key": "web_larazon", "name": "WEB Larazon", "url": "https://mioferton.larazon.es", "path": "", "keyword": None, "verify": False},
 
     # API targets
     {"key": "api_offers", "name": "API", "url": API, "path": "/public/offers", "keyword": None, "verify": False},
@@ -98,7 +98,7 @@ def monitor():
         ok, lat, code = check_url(*args)
         # check one more time if not ok
         if not ok:
-            time.sleep(20)
+            time.sleep(30)
             ok, lat, code = check_url(*args)
 
         key = t["key"]
